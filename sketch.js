@@ -1,6 +1,7 @@
 let table;
 let volcanoes = [];
 let worldMapImg; // Immagine della mappa del mondo
+let planisferoSVG = null; // SVG del planisfero come sfondo
 
 // Dimensioni del riquadro
 let boxWidth = 1200;
@@ -33,14 +34,11 @@ function preload() {
   // 1. Scaricare l'immagine e salvarla come 'world-map.png' nella stessa cartella
   // 2. Oppure usare un server locale (es. python -m http.server) per evitare problemi CORS
   
-  // Opzione 1: Carica da file locale (consigliato)
-  // Scarica l'immagine da Dreamstime e salvala come 'world-map.png' nella cartella del progetto
-  try {
-    worldMapImg = loadImage('world-map.png');
-  } catch(e) {
-    console.log('Immagine locale non trovata. Usa la mappa disegnata o aggiungi world-map.png');
-    worldMapImg = null;
-  }
+  // Carica il planisfero SVG come sfondo
+  planisferoSVG = loadImage('planisfero-01.svg');
+  
+  // world-map.png non esiste più, quindi non lo carichiamo
+  worldMapImg = null;
   
   // Opzione 2: Prova a caricare da URL (potrebbe non funzionare per CORS)
   // Decommenta queste righe se vuoi provare con un URL diretto:
@@ -926,8 +924,80 @@ function draw() {
     boxY = 350;
   }
   
-  // Disegna il riquadro con sfondo scuro elegante e bordo sottile
-  fill(22, 22, 28);
+  // Disegna il planisfero SVG come sfondo del riquadro
+  // Debug: verifica lo stato del caricamento
+  if (planisferoSVG && typeof planisferoSVG !== 'undefined') {
+    // Controlla se l'immagine è stata caricata completamente
+    // Per SVG, potrebbe essere necessario controllare anche se l'immagine è completa
+    if (planisferoSVG.width && planisferoSVG.width > 0 && planisferoSVG.height && planisferoSVG.height > 0) {
+      // Immagine caricata correttamente
+      push();
+      imageMode(CORNER);
+      noTint(); // Rimuove qualsiasi tint precedente
+      tint(255, 200); // Riduce l'opacità per non sovrastare i vulcani
+      
+      // Calcola il centro geografico dei vulcani
+      let centerLon = (minLon + maxLon) / 2;
+      let centerLat = (minLat + maxLat) / 2;
+      
+      // Il planisfero rappresenta il mondo intero (da -180 a 180 lon, da -85 a 85 lat circa)
+      let worldMinLon = -180;
+      let worldMaxLon = 180;
+      let worldMinLat = -85;
+      let worldMaxLat = 85;
+      
+      // Calcola dove viene disegnato il centro geografico dei vulcani nel box
+      // (usando la stessa mappatura usata per i vulcani)
+      let volcanoCenterX = map(centerLon, minLon, maxLon, boxX, boxX + boxWidth);
+      let volcanoCenterY = map(centerLat, maxLat, minLat, boxY, boxY + boxHeight);
+      
+      // Calcola dove si trova lo stesso punto geografico nel planisfero scalato
+      // (quando il planisfero viene scalato per riempire il box)
+      let planisferoCenterX = map(centerLon, worldMinLon, worldMaxLon, 0, boxWidth);
+      let planisferoCenterY = map(centerLat, worldMaxLat, worldMinLat, 0, boxHeight);
+      
+      // Calcola gli offset per allineare: vogliamo che il punto geografico nel planisfero
+      // corrisponda esattamente alla posizione dove viene disegnato il vulcano
+      let svgOffsetX = volcanoCenterX - (boxX + planisferoCenterX);
+      let svgOffsetY = volcanoCenterY - (boxY + planisferoCenterY);
+      
+      // Sposta lo sfondo più a destra
+      svgOffsetX += 50; // Aumenta questo valore per spostare più a destra
+      
+      // Sposta lo sfondo più in alto
+      svgOffsetY -= 60; // Diminuisci questo valore per spostare più in alto
+      
+      image(planisferoSVG, boxX + svgOffsetX, boxY + svgOffsetY, boxWidth, boxHeight);
+      noTint(); // Ripristina il tint normale
+      pop();
+    } else {
+      // L'immagine è ancora in caricamento o non è valida
+      // Mostra uno sfondo temporaneo
+      fill(22, 22, 28);
+      noStroke();
+      rect(boxX, boxY, boxWidth, boxHeight, 6);
+      
+      // Debug: mostra un messaggio se è la prima volta
+      if (frameCount === 1) {
+        console.log('Planisfero non ancora caricato. Dimensioni:', planisferoSVG.width, 'x', planisferoSVG.height);
+      }
+    }
+  } else {
+    // Fallback: sfondo scuro se l'SVG non è caricato
+    fill(22, 22, 28);
+    noStroke();
+    rect(boxX, boxY, boxWidth, boxHeight, 6);
+    
+    // Debug: mostra un messaggio solo una volta
+    if (frameCount === 1) {
+      console.warn('Planisfero SVG non disponibile. Assicurati che il file planisfero-01.svg esista nella stessa cartella.');
+      console.warn('Nota: p5.js potrebbe richiedere un server web locale per caricare file SVG.');
+      console.warn('Prova a eseguire: python -m http.server 8000 (o un altro server locale)');
+    }
+  }
+  
+  // Disegna il bordo del riquadro
+  noFill();
   stroke(70, 70, 80);
   strokeWeight(2);
   rect(boxX, boxY, boxWidth, boxHeight, 6);
