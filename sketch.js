@@ -18,6 +18,9 @@ let minLat, maxLat, minLon, maxLon;
 // Vulcano selezionato
 let selectedVolcano = null;
 
+// Vulcano su cui si fa hover
+let hoveredVolcano = null;
+
 // Variabile per l'evidenziazione delle legende quando si clicca il footer
 let highlightLegends = false;
 let highlightTimer = 0;
@@ -179,19 +182,21 @@ function drawTypeLegend() {
   let itemWidth = 220; // Larghezza approssimativa di ogni elemento (glifo + testo)
   let itemMargin = 15; // Margine tra gli elementi
   
-  // Calcola la larghezza totale della legenda
+  // Calcola la larghezza totale della legenda (valore fisso per consistenza)
   let legendWidth = cols * itemWidth + (cols - 1) * itemMargin;
   
-  // Centra la legenda rispetto alla canvas
-  let startX = (width - legendWidth) / 2;
+  // Centra la legenda rispetto alla canvas (arrotondato per consistenza)
+  let startX = Math.round((width - legendWidth) / 2);
   
   // Assicura che la legenda non vada fuori dai bordi
   let margin = 20;
   if (startX < margin) {
     startX = margin;
-    // Ricalcola itemWidth se necessario per adattarsi
+    // Ricalcola itemWidth se necessario per adattarsi (arrotondato per consistenza)
     legendWidth = width - (2 * margin);
-    itemWidth = (legendWidth - (cols - 1) * itemMargin) / cols;
+    itemWidth = Math.floor((legendWidth - (cols - 1) * itemMargin) / cols);
+    // Ricalcola legendWidth con il nuovo itemWidth
+    legendWidth = cols * itemWidth + (cols - 1) * itemMargin;
   }
   
   // Calcola l'altezza totale necessaria
@@ -205,7 +210,8 @@ function drawTypeLegend() {
   fill(180, 180, 190);
   noStroke();
   textStyle(NORMAL);
-  text("Clicca su ogni categoria per visualizzare solo i vulcani corrispondenti", width / 2, startY - padding - 8);
+  text("Clicca su ogni categoria per visualizzare solo i vulcani corrispondenti", width / 2, startY - padding - 20);
+  text("Clicca sul titolo per visualizzare l'elenco completo di tutti i tipi di vulcani", width / 2, startY - padding - 8);
   
   // Sfondo semi-trasparente elegante per la legenda dei tipi
   fill(25, 25, 32, 220);
@@ -221,13 +227,40 @@ function drawTypeLegend() {
   }
   rect(startX - padding, startY - padding, legendWidth + padding * 2, totalHeight, 8);
   
-  // Titolo - stile professionale migliorato
+  // Titolo - stile professionale migliorato e cliccabile
   textAlign(CENTER);
   textSize(13);
-  fill(245, 245, 250);
+  
+  // Calcola l'area cliccabile del titolo
+  let titleText = "Tipi di Vulcani";
+  let titleWidth = textWidth(titleText);
+  let titleX = width / 2;
+  let titleY = startY + 5;
+  let titleClickArea = {
+    x: titleX - titleWidth / 2 - 5,
+    y: titleY - 12,
+    width: titleWidth + 10,
+    height: 20
+  };
+  
+  // Salva l'area cliccabile del titolo
+  window.typeLegendTitleClickArea = titleClickArea;
+  
+  // Verifica se il mouse è sopra il titolo
+  let isTitleHovered = mouseX >= titleClickArea.x && mouseX <= titleClickArea.x + titleClickArea.width &&
+                       mouseY >= titleClickArea.y && mouseY <= titleClickArea.y + titleClickArea.height;
+  
+  // Colore del titolo (cambia se hover)
+  if (isTitleHovered) {
+    fill(100, 150, 255); // Blu quando hover
+    cursor(HAND);
+  } else {
+    fill(245, 245, 250);
+  }
+  
   noStroke();
   textStyle(BOLD);
-  text("Tipi di Vulcani", width / 2, startY + 5);
+  text(titleText, titleX, titleY);
   
   // Linea separatrice sottile sotto il titolo
   stroke(90, 90, 100, 150);
@@ -249,8 +282,9 @@ function drawTypeLegend() {
     let col = i % cols;
     let row = floor(i / cols);
     
-    let x = startX + (col * (itemWidth + itemMargin));
-    let y = startY + 28 + row * spacing;
+    // Calcola posizioni precise usando round per garantire centraggio corretto
+    let x = Math.round(startX + (col * (itemWidth + itemMargin)));
+    let y = Math.round(startY + 28 + row * spacing);
     
     // Verifica che l'elemento sia dentro la canvas
     if (x + itemWidth > width - margin) continue;
@@ -258,7 +292,16 @@ function drawTypeLegend() {
     // Calcola l'area cliccabile (larghezza completa dell'elemento, altezza basata su spacing)
     let itemHeight = spacing;
     let itemX = x;
-    let itemY = y - 8; // Offset per centrare verticalmente
+    let itemY = Math.round(y - 8); // Offset per centrare verticalmente
+    
+    // Area quadrata per il glifo (centrata verticalmente rispetto alla riga)
+    // Usa valori fissi e precisi per garantire consistenza
+    let glyphBoxSize = 12; // Dimensione del quadrato per il glifo
+    let glyphBoxX = Math.round(x + 6); // Posizione X del quadrato
+    let glyphBoxY = Math.round(y - 6); // Posizione Y del quadrato (centrato verticalmente)
+    // Centro matematicamente preciso del quadrato (round per centrare perfettamente)
+    let glyphX = Math.round(glyphBoxX + glyphBoxSize / 2);
+    let glyphY = Math.round(glyphBoxY + glyphBoxSize / 2);
     
     // Salva le informazioni per il click detection
     window.typeLegendItems.push({
@@ -291,20 +334,25 @@ function drawTypeLegend() {
       }
     }
     
-    // Disegna il glifo con stile più elegante
+    // Disegna il glifo centrato nell'area quadrata
+    // Usa coordinate precise e arrotondate per garantire consistenza
     push();
     // Colore più intenso se selezionato
     let colGlyph = isSelected ? color(255, 180, 50) : color(190, 190, 200);
     fill(colGlyph);
     stroke(colGlyph);
     strokeWeight(isSelected ? 1.5 : 1.2);
-    drawVolcanoGlyph(x + 10, y, type);
+    // Il glifo viene disegnato esattamente al centro del quadrato
+    // Le coordinate sono già arrotondate per pixel perfetti
+    // Aggiungi un leggero offset verticale (+0.5) per bilanciare visivamente forme asimmetriche
+    drawVolcanoGlyph(glyphX, glyphY + 0.5, type);
     pop();
     
-    // Testo del tipo con migliore leggibilità
+    // Testo del tipo con migliore leggibilità (allineato verticalmente con il centro del quadrato del glifo)
     fill(isSelected ? color(255, 220, 120) : color(230, 230, 240));
     noStroke();
     textStyle(isSelected ? BOLD : NORMAL);
+    textAlign(LEFT, CENTER); // Allinea verticalmente al centro
     // Tronca il testo se è troppo lungo
     let displayType = type;
     let maxTextWidth = itemWidth - 30;
@@ -314,7 +362,8 @@ function drawTypeLegend() {
       }
       displayType += "...";
     }
-    text(displayType, x + 22, y + 4);
+    text(displayType, x + 22, glyphY); // Allineato con il centro del quadrato del glifo
+    textAlign(LEFT, BASELINE); // Ripristina l'allineamento di default
   }
   
   // Il cursore verrà gestito in draw() per evitare conflitti
@@ -391,7 +440,8 @@ function drawLegend() {
 // Funzione per disegnare il glifo del vulcano in base al tipo
 function drawVolcanoGlyph(x, y, type) {
   push();
-  translate(x, y);
+  // Usa round per centrare perfettamente il glifo
+  translate(Math.round(x), Math.round(y));
   
   // Dimensioni base del glifo
   let size = 5;
@@ -1008,6 +1058,29 @@ function draw() {
   strokeWeight(1);
   rect(boxX + 1, boxY + 1, boxWidth - 2, boxHeight - 2, 6);
   
+  // Rileva il vulcano su cui si fa hover
+  hoveredVolcano = null;
+  if (mouseX >= boxX && mouseX <= boxX + boxWidth &&
+      mouseY >= boxY && mouseY <= boxY + boxHeight) {
+    let hoverRadius = 15; // Raggio di hover in pixel
+    let minDistance = Infinity;
+    
+    for (let volcano of volcanoes) {
+      // Filtra in base al tipo selezionato nella legenda
+      if (selectedType !== null && volcano.type !== selectedType) {
+        continue;
+      }
+      
+      if (volcano.x && volcano.y) {
+        let distance = dist(mouseX, mouseY, volcano.x, volcano.y);
+        if (distance < hoverRadius && distance < minDistance) {
+          minDistance = distance;
+          hoveredVolcano = volcano;
+        }
+      }
+    }
+  }
+  
   // Disegna i glifi per ogni vulcano alle coordinate geografiche (lat/lon mappate)
   // con colori basati sull'elevazione
   for (let volcano of volcanoes) {
@@ -1029,11 +1102,17 @@ function draw() {
       // Disegna il glifo unico in base al tipo di vulcano
       // alle coordinate mappate da lat/lon
       if (volcano.type) {
-        // Evidenzia il vulcano selezionato
+        // Evidenzia il vulcano selezionato o su cui si fa hover
         if (volcano === selectedVolcano) {
           push();
           strokeWeight(2.5);
           stroke(255, 180, 50); // Bordo arancione/ambra per il selezionato su sfondo scuro
+          drawVolcanoGlyph(volcano.x, volcano.y, volcano.type);
+          pop();
+        } else if (volcano === hoveredVolcano) {
+          push();
+          strokeWeight(2);
+          stroke(100, 150, 255); // Bordo blu per l'hover
           drawVolcanoGlyph(volcano.x, volcano.y, volcano.type);
           pop();
         } else {
@@ -1041,6 +1120,11 @@ function draw() {
         }
       }
     }
+  }
+  
+  // Disegna il tooltip per il vulcano su cui si fa hover
+  if (hoveredVolcano && hoveredVolcano !== selectedVolcano) {
+    drawVolcanoTooltip(hoveredVolcano);
   }
   
   // Disegna la legenda con i dati del vulcano selezionato
@@ -1103,6 +1187,17 @@ function mousePressed() {
   let footerHeight = 40;
   let footerY = height - footerHeight;
   
+  // Controlla se il click è sul titolo della legenda dei tipi
+  if (window.typeLegendTitleClickArea) {
+    let titleArea = window.typeLegendTitleClickArea;
+    if (mouseX >= titleArea.x && mouseX <= titleArea.x + titleArea.width &&
+        mouseY >= titleArea.y && mouseY <= titleArea.y + titleArea.height) {
+      // Apri la pagina con tutti i tipi di vulcani
+      window.open('types-legend.html', '_blank');
+      return; // Non processare altri click
+    }
+  }
+  
   // Controlla se il click è su un elemento della legenda dei tipi
   if (window.typeLegendItems) {
     for (let item of window.typeLegendItems) {
@@ -1154,8 +1249,128 @@ function mousePressed() {
     
     if (closestVolcano) {
       selectedVolcano = closestVolcano;
+      // Apri una nuova pagina con la legenda e i dati del vulcano
+      openLegendPage(closestVolcano);
     }
   }
+}
+
+// Funzione per aprire la pagina della legenda con i dati del vulcano
+function openLegendPage(volcano) {
+  // Prepara i dati del vulcano da passare all'URL
+  const volcanoData = {
+    volcanoNumber: volcano.volcanoNumber || '',
+    volcanoName: volcano.volcanoName || '',
+    country: volcano.country || '',
+    type: volcano.type || '',
+    elevation: volcano.elevation || '',
+    typeCategory: volcano.typeCategory || '',
+    status: volcano.status || '',
+    lastKnownEruption: volcano.lastKnownEruption || '',
+    lat: volcano.lat || '',
+    lon: volcano.lon || ''
+  };
+  
+  // Codifica i dati come parametro URL
+  const encodedData = encodeURIComponent(JSON.stringify(volcanoData));
+  
+  // Apri la nuova pagina
+  window.open(`legend.html?data=${encodedData}`, '_blank');
+}
+
+// Funzione per disegnare il tooltip del vulcano su cui si fa hover
+function drawVolcanoTooltip(volcano) {
+  let tooltipWidth = 220;
+  let tooltipHeight = 100; // Aumentata per includere il nome
+  let padding = 10;
+  let margin = 15;
+  let offset = 20; // Offset dalla posizione del vulcano
+  
+  // Calcola la posizione del tooltip (sopra il vulcano)
+  let tooltipX = volcano.x - tooltipWidth / 2;
+  let tooltipY = volcano.y - tooltipHeight - offset;
+  
+  // Se va fuori a sinistra, allinea a sinistra
+  if (tooltipX < margin) {
+    tooltipX = margin;
+  }
+  
+  // Se va fuori a destra, allinea a destra
+  if (tooltipX + tooltipWidth > width - margin) {
+    tooltipX = width - tooltipWidth - margin;
+  }
+  
+  // Se va fuori in alto, posiziona sotto il vulcano
+  if (tooltipY < margin) {
+    tooltipY = volcano.y + offset;
+  }
+  
+  // Se va fuori in basso, posiziona sopra
+  if (tooltipY + tooltipHeight > height - margin) {
+    tooltipY = volcano.y - tooltipHeight - offset;
+  }
+  
+  // Sfondo semi-trasparente scuro elegante
+  fill(32, 32, 38, 245);
+  stroke(100, 150, 255, 200);
+  strokeWeight(1.5);
+  rect(tooltipX, tooltipY, tooltipWidth, tooltipHeight, 6);
+  
+  // Ombra sottile
+  fill(10, 10, 15, 180);
+  noStroke();
+  rect(tooltipX + 2, tooltipY + 2, tooltipWidth, tooltipHeight, 6);
+  
+  // Testo del tooltip
+  textAlign(LEFT);
+  textSize(11);
+  fill(245, 245, 250);
+  noStroke();
+  textStyle(BOLD);
+  
+  // Nome del vulcano
+  let nameText = volcano.volcanoName || 'N/A';
+  if (textWidth(nameText) > tooltipWidth - padding * 2) {
+    while (textWidth(nameText + "...") > tooltipWidth - padding * 2 && nameText.length > 0) {
+      nameText = nameText.substring(0, nameText.length - 1);
+    }
+    nameText += "...";
+  }
+  text("Nome: " + nameText, tooltipX + padding, tooltipY + 18);
+  
+  // Tipo
+  textStyle(NORMAL);
+  fill(200, 200, 210);
+  let typeText = volcano.type || 'N/A';
+  if (textWidth(typeText) > tooltipWidth - padding * 2) {
+    while (textWidth(typeText + "...") > tooltipWidth - padding * 2 && typeText.length > 0) {
+      typeText = typeText.substring(0, typeText.length - 1);
+    }
+    typeText += "...";
+  }
+  text("Tipo: " + typeText, tooltipX + padding, tooltipY + 38);
+  
+  // Elevazione
+  let elevationText = volcano.elevation ? nf(volcano.elevation, 0, 0) + " m" : 'N/A';
+  text("Elevazione: " + elevationText, tooltipX + padding, tooltipY + 58);
+  
+  // Ultima eruzione
+  let eruptionText = volcano.lastKnownEruption || 'N/A';
+  if (textWidth(eruptionText) > tooltipWidth - padding * 2) {
+    while (textWidth(eruptionText + "...") > tooltipWidth - padding * 2 && eruptionText.length > 0) {
+      eruptionText = eruptionText.substring(0, eruptionText.length - 1);
+    }
+    eruptionText += "...";
+  }
+  text("Ultima eruzione: " + eruptionText, tooltipX + padding, tooltipY + 78);
+  
+  // Linee separatrici
+  stroke(90, 90, 100, 150);
+  strokeWeight(1);
+  line(tooltipX + padding, tooltipY + 25, tooltipX + tooltipWidth - padding, tooltipY + 25);
+  line(tooltipX + padding, tooltipY + 45, tooltipX + tooltipWidth - padding, tooltipY + 45);
+  line(tooltipX + padding, tooltipY + 65, tooltipX + tooltipWidth - padding, tooltipY + 65);
+  noStroke();
 }
 
 // Funzione per disegnare le informazioni del vulcano selezionato
